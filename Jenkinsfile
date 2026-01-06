@@ -1,35 +1,50 @@
-stages {
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "cicd-pipeline-app"
+        CI = 'true' 
+    }
+
+    stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build Docker image') {
+        stage('Install Dependencies') {
             steps {
-                // Using standard shell commands instead of the docker global variable
-                sh "docker build -t ${IMAGE_NAME}:latest ."
+                echo 'Running build script...'
+                sh 'chmod +x scripts/build.sh'
+                sh './scripts/build.sh'
             }
         }
 
         stage('Run Tests') {
             steps {
-                // Instead of .inside{}, we use 'docker run'
-                // --rm removes the container after it exits
-                // -v mounts the current workspace so the container can see your code
-                sh """
-                    docker run --rm -v ${WORKSPACE}:/app -w /app ${IMAGE_NAME}:latest sh -c '
-                        echo "Running tests..."
-                        if [ -f package.json ]; then
-                            npm install && npm test
-                        elif [ -f requirements.txt ]; then
-                            pip install -r requirements.txt && pytest
-                        else
-                            echo "No tests found"
-                            exit 1
-                        fi
-                    '
-                """
+                echo 'Running test script...'
+                sh 'chmod +x scripts/test.sh'
+                sh './scripts/test.sh'
             }
         }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:latest ."
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check the logs to see if npm or docker is missing.'
+        }
+        always {
+            cleanWs()
+        }
+    }
 }
